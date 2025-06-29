@@ -5,12 +5,10 @@ import mongoose from 'mongoose'
 const app = express()
 const port = process.env.PORT || 3000
 
-// Conecta ao MongoDB Atlas
 mongoose.connect('mongodb+srv://designstyler:aolrte@projeto-sobrancelha.ydopwo5.mongodb.net/agendamentos?retryWrites=true&w=majority')
   .then(() => console.log('MongoDB conectado'))
   .catch(err => console.error('Erro MongoDB:', err))
 
-// Schema e Model
 const agendamentoSchema = new mongoose.Schema({
   nome: String,
   email: String,
@@ -26,38 +24,45 @@ const Agendamento = mongoose.model('Agendamento', agendamentoSchema)
 app.use(cors())
 app.use(express.json())
 
-// Criar agendamento com validações
+// Criar agendamento com regras
 app.post('/agendar', async (req, res) => {
   try {
-    const { data, servico } = req.body
+    const { nome, email, telefone, data, horario, servico, observacao } = req.body
 
-    // Verifica se o serviço é do tipo que só pode ter 1 agendamento por dia
-    const servicosUnicosPorDia = ['Design + Microblading'] // adicione outros serviços se quiser
-
-    if (servicosUnicosPorDia.includes(servico)) {
-      const existe = await Agendamento.findOne({ data, servico })
-      if (existe) {
-        return res.status(400).json({ error: `Já existe um agendamento para ${servico} neste dia.` })
-      }
+    if (!nome || !email || !telefone || !data || !horario || !servico) {
+      return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos.' })
     }
 
-    // Verifica se a data é dia de semana (segunda a sexta)
+    // Não permitir agendamentos no fim de semana
     const diaSemana = new Date(data).getDay() // 0 = domingo, 6 = sábado
     if (diaSemana === 0 || diaSemana === 6) {
       return res.status(400).json({ error: 'Agendamento não permitido para finais de semana.' })
     }
 
-    // Se passar, cria o agendamento
-    const novoAgendamento = new Agendamento(req.body)
+    const agendamentosDoDia = await Agendamento.find({ data })
+
+    // Se já houver um "Design + Microblading", bloqueia tudo
+    const temMicroblading = agendamentosDoDia.some(a => a.servico === 'Design + Microblading')
+    if (temMicroblading) {
+      return res.status(400).json({ error: 'Já há um agendamento de Design + Microblading nesse dia. Nenhum outro agendamento permitido.' })
+    }
+
+    // Se quiser agendar "Design + Microblading", o dia precisa estar completamente livre
+    if (servico === 'Design + Microblading' && agendamentosDoDia.length > 0) {
+      return res.status(400).json({ error: 'Já há agendamentos nesse dia. Não é possível marcar Design + Microblading.' })
+    }
+
+    const novoAgendamento = new Agendamento({ nome, email, telefone, data, horario, servico, observacao })
     await novoAgendamento.save()
     res.status(201).json({ message: 'Agendamento criado com sucesso!' })
 
   } catch (error) {
+    console.error(error)
     res.status(500).json({ error: 'Erro ao criar agendamento' })
   }
 })
 
-// Listar agendamentos
+// Listar todos
 app.get('/agendamentos', async (req, res) => {
   try {
     const agendamentos = await Agendamento.find()
@@ -67,7 +72,7 @@ app.get('/agendamentos', async (req, res) => {
   }
 })
 
-// Atualizar agendamento
+// Atualizar
 app.put('/agendamentos/:id', async (req, res) => {
   try {
     const atualizado = await Agendamento.findByIdAndUpdate(req.params.id, req.body, { new: true })
@@ -77,7 +82,7 @@ app.put('/agendamentos/:id', async (req, res) => {
   }
 })
 
-// Deletar agendamento
+// Deletar
 app.delete('/agendamentos/:id', async (req, res) => {
   try {
     await Agendamento.findByIdAndDelete(req.params.id)
@@ -87,7 +92,7 @@ app.delete('/agendamentos/:id', async (req, res) => {
   }
 })
 
-// Start do servidor
+// Iniciar servidor
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`)
 })
