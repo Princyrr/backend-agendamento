@@ -1,4 +1,3 @@
-// server.js
 import express from 'express'
 import cors from 'cors'
 import mongoose from 'mongoose'
@@ -27,12 +26,32 @@ const Agendamento = mongoose.model('Agendamento', agendamentoSchema)
 app.use(cors())
 app.use(express.json())
 
-// Criar agendamento
+// Criar agendamento com validações
 app.post('/agendar', async (req, res) => {
   try {
+    const { data, servico } = req.body
+
+    // Verifica se o serviço é do tipo que só pode ter 1 agendamento por dia
+    const servicosUnicosPorDia = ['Design + Microblading'] // adicione outros serviços se quiser
+
+    if (servicosUnicosPorDia.includes(servico)) {
+      const existe = await Agendamento.findOne({ data, servico })
+      if (existe) {
+        return res.status(400).json({ error: `Já existe um agendamento para ${servico} neste dia.` })
+      }
+    }
+
+    // Verifica se a data é dia de semana (segunda a sexta)
+    const diaSemana = new Date(data).getDay() // 0 = domingo, 6 = sábado
+    if (diaSemana === 0 || diaSemana === 6) {
+      return res.status(400).json({ error: 'Agendamento não permitido para finais de semana.' })
+    }
+
+    // Se passar, cria o agendamento
     const novoAgendamento = new Agendamento(req.body)
     await novoAgendamento.save()
     res.status(201).json({ message: 'Agendamento criado com sucesso!' })
+
   } catch (error) {
     res.status(500).json({ error: 'Erro ao criar agendamento' })
   }
