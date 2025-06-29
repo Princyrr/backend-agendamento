@@ -6,11 +6,12 @@ import mongoose from 'mongoose'
 const app = express()
 const port = process.env.PORT || 3000
 
-// Conecta no MongoDB Atlas (troca a URI pela sua)
-mongoose.connect('mongodb+srv://designstyler:aolrte@projeto-sobrancelha.ydopwo5.mongodb.net/agendamentos')
+// Conecta ao MongoDB Atlas
+mongoose.connect('mongodb+srv://designstyler:aolrte@projeto-sobrancelha.ydopwo5.mongodb.net/agendamentos?retryWrites=true&w=majority')
   .then(() => console.log('MongoDB conectado'))
   .catch(err => console.error('Erro MongoDB:', err))
 
+// Schema e Model
 const agendamentoSchema = new mongoose.Schema({
   nome: String,
   email: String,
@@ -26,7 +27,7 @@ const Agendamento = mongoose.model('Agendamento', agendamentoSchema)
 app.use(cors())
 app.use(express.json())
 
-// Rota para salvar agendamento
+// Criar agendamento
 app.post('/agendar', async (req, res) => {
   try {
     const novoAgendamento = new Agendamento(req.body)
@@ -37,7 +38,7 @@ app.post('/agendar', async (req, res) => {
   }
 })
 
-// Rota para listar agendamentos
+// Listar agendamentos
 app.get('/agendamentos', async (req, res) => {
   try {
     const agendamentos = await Agendamento.find()
@@ -47,6 +48,27 @@ app.get('/agendamentos', async (req, res) => {
   }
 })
 
+// Atualizar agendamento
+app.put('/agendamentos/:id', async (req, res) => {
+  try {
+    const atualizado = await Agendamento.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    res.status(200).json(atualizado)
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar agendamento' })
+  }
+})
+
+// Deletar agendamento
+app.delete('/agendamentos/:id', async (req, res) => {
+  try {
+    await Agendamento.findByIdAndDelete(req.params.id)
+    res.status(200).json({ message: 'Agendamento deletado com sucesso' })
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar agendamento' })
+  }
+})
+
+// Start do servidor
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`)
 })
